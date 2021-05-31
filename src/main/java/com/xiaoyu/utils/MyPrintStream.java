@@ -7,7 +7,7 @@ import javax.swing.JTextArea;
 import javax.swing.SwingUtilities;
 
 public class MyPrintStream extends PrintStream {
-	
+
 	private JTextArea text;
 	private StringBuffer sb = new StringBuffer();
 
@@ -15,16 +15,17 @@ public class MyPrintStream extends PrintStream {
 		super(out);
 		this.text = text;
 	}
-	
-	 public void write(byte[] buf, int off, int len) { 
-         final String message = new String(buf, off, len);  
-         SwingUtilities.invokeLater(new Runnable(){
-         public void run(){
-          sb.append(message);
-          text.setText(sb.toString());
-          text.paintImmediately(text.getBounds());
-         }
-      });
-   }
-	
+
+	public void write(byte[] buf, int off, int len) {
+		final String message = new String(buf, off, len);
+		SwingUtilities.invokeLater(new Runnable() {
+			public void run() {
+				sb.append(message);
+				text.setText(sb.toString());
+				text.paintImmediately(text.getBounds());
+			}
+		});
+		super.write(buf, off, len);
+	}
+
 }

@@ -30,7 +30,8 @@ public class Application {
 			flag = readyWin.run();
 		}).start();
 		int time = 0;
-		while(time < 120) {
+		log.info("监听程序界面调用，timeout 为 10分钟");
+		while(time < 1200) {
 			if (flag != null && flag) {
 				log.info("chrome浏览器启动完成");
 				EventQueue.invokeLater(() -> {
@@ -38,10 +39,12 @@ public class Application {
 				});
 				break;
 			}
-			log.info("监听程序界面调用，" + ++time);
+			if(flag != null && !flag) {
+				log.info("程序界面启动失败，请检查原因");
+				System.exit(0);
+			}
 			Thread.currentThread().sleep(500);
 		}
-		log.info("程序界面启动失败，请检查原因");
 	}
 
 	public static void main(String[] args) throws InterruptedException {

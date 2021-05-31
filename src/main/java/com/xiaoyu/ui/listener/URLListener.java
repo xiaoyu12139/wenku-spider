@@ -9,7 +9,7 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 
 import com.xiaoyu.model.DownloadModel;
-import com.xiaoyu.spider.Fetch;
+import com.xiaoyu.spider.impl.FetchImpl;
 import com.xiaoyu.ui.panel.Top;
 
 import lombok.extern.slf4j.Slf4j;
@@ -52,7 +52,7 @@ public class URLListener implements KeyListener, ActionListener {
 			return ;
 		new Thread(() -> {
 			try {
-				Fetch fetchDoc = new Fetch();
+				FetchImpl fetchDoc = new FetchImpl();
 				fetchDoc.run();
 			} catch (Exception e1) {
 				e1.printStackTrace();

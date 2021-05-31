@@ -148,7 +148,8 @@ public class LaunchFrame extends JDialog {
 					log.info("notifyall");
 					LaunchFrame.class.notifyAll();
 				}
-				LaunchFrame.this.dispose();
+//				LaunchFrame.this.dispose();
+				LaunchFrame.this.setVisible(false);
 			}
 		});
 

@@ -1,6 +1,7 @@
 package com.xiaoyu.ui;
 
 import java.awt.BorderLayout;
+import java.awt.Dimension;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 
@@ -25,7 +26,6 @@ public class ReadyWindow extends JWindow{
 	private JTextArea out = new JTextArea("∆Ù∂Ø–≈œ¢°≠°≠");
 	
 	public ReadyWindow(LaunchFrame launch) {
-		log.info("1");
 		this.launch = launch;
 		Icon icon = new ImageIcon(StrUtil.RUNIMG);
 		JLabel img = new JLabel();
@@ -44,7 +44,7 @@ public class ReadyWindow extends JWindow{
 		layout.columnWidths = new int[] { 0 };
 		layout.columnWeights = new double[] { 1.0 };
 		layout.rowHeights = new int[] { 0, 0 };
-		layout.rowWeights = new double[] { 0.6, 0.4 };
+		layout.rowWeights = new double[] { 0.6, 1};
 		panel.setLayout(layout);
 		GridBagConstraints c = new GridBagConstraints();
 
@@ -59,10 +59,15 @@ public class ReadyWindow extends JWindow{
 		c.gridy = 1;
 		layout.setConstraints(sp, c);
 		panel.add(sp);
+		
+		panel.setSize(400, 300);
 
+//		setAlwaysOnTop(true);
 		setLayout(new BorderLayout());
 		getContentPane().add(panel, BorderLayout.CENTER);
-		setSize(400, 300);
+//		setSize(400, 300);
+		setPreferredSize(new Dimension(400, 300));
+		pack();
 		setLocationRelativeTo(null);
 		setVisible(true);
 	}
