@@ -37,6 +37,7 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.xiaoyu.model.DownloadModel;
+import com.xiaoyu.spider.Fetch;
 import com.xiaoyu.ui.LaunchFrame;
 import com.xiaoyu.ui.panel.InputDialog;
 import com.xiaoyu.ui.panel.Mid;
@@ -46,17 +47,41 @@ import com.xiaoyu.utils.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class FetchImpl {
+public class FetchImpl implements Fetch{
 
 	private DownloadModel downloadModel = DownloadModel.getInstance();
 	private Map<String, String> map = null;
-	private CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
+	
 
-	public void run() throws FileNotFoundException {
-		WebDriver driver = LaunchFrame.driver;
+	@Override
+	public void initPage() {
+		try {
+			//请求页面
+			requestPage();
+			//读取本地cookie,检验cookie
+			boolean overdue = readLocalCookie();
+			//cookie过器重新开启浏览器，并获取到用户输入的密码，进行登录
+			//登录成功后，将该登录成功的页面的cookie记录到本地，关闭当前临时浏览器
+			//重新读取本地cookie，并刷新当前页面
+			if(!overdue)
+				if(!reloadCookie()) return ;
+			checkTypeAndInvoke();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	private void requestPage() {
 		log.info("浏览器窗口回调完成，正在请求页面：" + downloadModel.getUrl());
 		driver.get(downloadModel.getUrl());
 		log.info("页面请求完成。");
+	}
+	
+	/**
+	 * cookie失效返回false
+	 * @return
+	 */
+	private boolean readLocalCookie() {
 		Cookie cookie = CookieUtil.getCookie();
 		if (cookie != null) {
 			log.info("读取本地存储的cookie.");
@@ -70,39 +95,36 @@ public class FetchImpl {
 		String pageData = parseHtml(pageSource);
 		log.info("抓取到pageData:" + pageData);
 		log.info("开始校验 cookie.");
-		boolean flag = checkCookie(pageData);
-		if (!flag) {
-			log.info("cookie 过期，请重新登录。");
-			// 确认用户重新登录后，也就是用户点击成功登录后，
-			// 获取到cookie，存储到本地，更新pageData
-			// continue
-			InputDialog in = new InputDialog();
-			log.info("等待用户输入");
-//			synchronized (InputDialog.class) {
-//				try {
-//					InputDialog.class.wait();
-//				} catch (InterruptedException e) {
-//					e.printStackTrace();
-//				}
-//			}
-			map = in.getMap();
-			log.info("密码：" + map.get("pw"));
-			log.info("账号密码输入完成。");
-			if (login(driver)) {
-				log.info("登录成功，正在序列化cookie到本地文件。");
-				WebDriver.Options manage = driver.manage();
-				Cookie c = manage.getCookieNamed("BDUSS");
-				CookieUtil.setCookie(c);
-				log.info("登录成功，准备开始抓取。");
-				pageData = parseHtml(driver.getPageSource());
-				log.info("当前pageData:" + pageData);
-			} else {
-				log.info("登录失败，退出本次抓取。");
-				return;
-			}
+		return checkCookie(pageData);
+	}
+	
+	private boolean reloadCookie() {
+		String pageSource = driver.getPageSource();
+		String pageData = parseHtml(pageSource);
+		log.info("cookie 过期，请重新登录。");
+		InputDialog in = new InputDialog();
+		log.info("等待用户输入");
+		map = in.getMap();
+		log.info("密码：" + map.get("pw"));
+		log.info("账号密码输入完成。");
+		if (login(driver)) {
+			log.info("登录成功，正在序列化cookie到本地文件。");
+			WebDriver.Options manage = driver.manage();
+			Cookie c = manage.getCookieNamed("BDUSS");
+			CookieUtil.setCookie(c);
+			log.info("登录成功，准备开始抓取。");
+			pageData = parseHtml(driver.getPageSource());
+			log.info("当前pageData:" + pageData);
 		} else {
-			log.info("cookie 校验通过.");
+			log.info("登录失败，退出本次抓取。");
+			return false;
 		}
+		return true;
+	}
+
+	private void checkTypeAndInvoke() throws FileNotFoundException {
+		String pageSource = driver.getPageSource();
+		String pageData = parseHtml(pageSource);
 		JSONObject json = JSON.parseObject(pageData);
 		final JSONObject temp = json;
 		new Thread(() -> {
@@ -113,6 +135,7 @@ public class FetchImpl {
 		new FetchDocImpl().run(driver, json);
 		log.info("本次抓取完成");
 	}
+
 
 	/**
 	 * 设置mid面板中显示的该文档的一些信息
@@ -150,7 +173,7 @@ public class FetchImpl {
 
 	public boolean loginPage(WebDriver driver, boolean head) {
 		// 回调窗口，获取输入的username,password
-		WebElement nologin = driver.findElement(By.cssSelector("div[class~='user-icon-content']"));
+		WebElement nologin = driver.findElement(By.cssSelector("div[class~='user-icon-wrap']"));
 		nologin.click();
 		log.info("开始模拟登录。");
 		WebElement qq = waitLoad(driver, "li[class='bd-acc-qzone']");
@@ -266,16 +289,15 @@ public class FetchImpl {
 		}
 	}
 
+	//判断坐上角是否有登录标志符
 	private boolean checkCookie(String pageData) {
-		JSONObject json = JSON.parseObject(pageData);
-		JSONObject urls = json.getJSONObject("readerInfo2019").getJSONObject("htmlUrls");
-		JSONArray jsons = urls.getJSONArray("json");
-		String needSize = json.getJSONObject("docInfo2019").getJSONObject("doc_info").getString("page");
-		log.info("当前能抓取到" + jsons.size() + "页");
-		log.info("当前文档共有" + needSize + "页");
-		if (jsons.size() >= Integer.valueOf(needSize))
-			return true;
-		return false;
+        try {
+            driver.findElement(By.cssSelector("div[class~='login']"));
+            return true;
+        } catch (Exception e) {
+            System.out.println("不存在此元素");
+            return false;
+        }
 	}
 
 	public String parseHtml(String html) {
@@ -292,4 +314,5 @@ public class FetchImpl {
 		}
 		return "";
 	}
+
 }

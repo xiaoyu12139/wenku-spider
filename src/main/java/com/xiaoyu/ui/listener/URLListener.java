@@ -4,11 +4,11 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
 import java.awt.event.KeyListener;
-import java.io.FileNotFoundException;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 import com.xiaoyu.model.DownloadModel;
+import com.xiaoyu.spider.Fetch;
 import com.xiaoyu.spider.impl.FetchImpl;
 import com.xiaoyu.ui.panel.Top;
 
@@ -52,8 +52,8 @@ public class URLListener implements KeyListener, ActionListener {
 			return ;
 		new Thread(() -> {
 			try {
-				FetchImpl fetchDoc = new FetchImpl();
-				fetchDoc.run();
+				Fetch fetch = new FetchImpl();
+				fetch.initPage();
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}

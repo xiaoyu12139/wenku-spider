@@ -18,6 +18,8 @@ import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 
+import org.apache.commons.math3.util.MultidimensionalCounter.Iterator;
+import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.BasicCookieStore;
@@ -47,6 +49,8 @@ import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 import com.xiaoyu.model.DownloadModel;
+import com.xiaoyu.model.PageModel;
+import com.xiaoyu.spider.FetchDoc;
 import com.xiaoyu.ui.panel.Mid;
 import com.xiaoyu.utils.CookieUtil;
 import com.xiaoyu.utils.StrUtil;
@@ -54,12 +58,92 @@ import com.xiaoyu.utils.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class FetchDocImpl {
+public class FetchDocImpl implements FetchDoc {
 
 	private Mid mid = Mid.getInstance();
 	private CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
 
-	
+	// BDUSS
+	public void run(WebDriver driver, JSONObject json) {
+		try {
+			initModel(json);
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+
+	@Override
+	public void initModel(JSONObject json) {
+		JSONObject urls = json.getJSONObject("readerInfo2019").getJSONObject("htmlUrls");
+		JSONArray jsons = urls.getJSONArray("json");
+		JSONArray pngs = urls.getJSONArray("png");
+		//初始化jsonurl
+		for (int i = 0; i < jsons.size(); i++) {
+			JSONObject o = jsons.getJSONObject(i);
+			String url = o.getString("pageLoadUrl");
+			String index = o.getString("pageIndex");
+			if(docModel.containsKey(Integer.valueOf(index))) {
+				docModel.get(Integer.valueOf(index)).setJsonUrl(url);
+				continue;
+			}
+			PageModel model = new PageModel();
+			model.setJsonUrl(url);
+			docModel.put(Integer.valueOf(index), model);
+		}
+		//初始化imgurl
+		for (int i = 0; i < pngs.size(); i++) {
+			JSONObject o = jsons.getJSONObject(i);
+			String url = o.getString("pageLoadUrl");
+			String index = o.getString("pageIndex");
+			if(docModel.containsKey(Integer.valueOf(index))) {
+				docModel.get(Integer.valueOf(index)).setImagUrl(url);
+				continue;
+			}
+			PageModel model = new PageModel();
+			model.setImagUrl(url);
+			docModel.put(Integer.valueOf(index), model);
+		}
+		//初始化need
+		for(java.util.Iterator<Integer> i = docModel.keySet().iterator(); i.hasNext();) {
+			try {
+				PageModel pageModel = docModel.get(i.next());
+				String jsonUrl = pageModel.getJsonUrl();
+				if(jsonUrl.equals("")) continue;
+				String str = EntityUtils.toString(client.execute(new HttpGet(jsonUrl)).getEntity());
+				JSONObject page = JSON.parseObject(str);
+				JSONArray body = page.getJSONArray("body");
+				for(int j = 0; j < body.size(); j++) {
+					JSONObject obj = body.getJSONObject(j);
+					if (obj.getString("t").equals("pic") && obj.getString("s") != null) {
+						String tmp = obj.getJSONObject("s").getString("pic_file");
+						Pattern p = Pattern.compile("_([0-9]*)_");
+						Matcher m = p.matcher(tmp);
+						if (m.find())
+							tmp = m.group(1);
+						if(docModel.containsKey(Integer.valueOf(tmp)))
+							docModel.get(Integer.valueOf(tmp)).getNeedImage().add(obj);
+					}
+				}
+			} catch (Exception e) {
+				e.printStackTrace();
+			}
+		}
+		//调整每一页里面的需要裁剪部分的顺序，从上到下，从左到右
+		
+	}
+
+	@Override
+	public void parseAndDownPage() {
+		// TODO Auto-generated method stub
+
+	}
+
+	@Override
+	public void download() {
+		// TODO Auto-generated method stub
+
+	}
+
 	// 根据页面源码得到，pageData下面的描述文档的内容
 	public String parseHtml(String html) {
 		Document doc = Jsoup.parse(html);
@@ -76,6 +160,7 @@ public class FetchDocImpl {
 		return "";
 	}
 
+	//pageIndex
 	// 根据得到的pageData，解析得到文档资源的每一页的urls
 	public Map<String, List<String>> getAllPage(JSONObject json) {
 		List<String> resJson = new ArrayList<String>();
@@ -98,18 +183,18 @@ public class FetchDocImpl {
 		map.put("png", resPng);
 		return map;
 	}
-	
-	//解析页面结构，不能单页解析，要全部的页面一起解析
-	
+
+	// 解析页面结构，不能单页解析，要全部的页面一起解析
 
 	// 解析文档每一页的资源
 	public void parseAllPage(JSONObject json) {
 		try {
 			XWPFDocument document = new XWPFDocument();
 			String fileName = json.getString("title");
-			if(fileName == null) fileName = "NB";
+			if (fileName == null)
+				fileName = "NB";
 			File file = new File(System.getProperty("user.dir") + "\\downloads\\" + fileName + ".docx");
-			if(!file.getParentFile().exists())
+			if (!file.getParentFile().exists())
 				file.getParentFile().mkdirs();
 			if (!file.exists())
 				file.createNewFile();
@@ -117,7 +202,7 @@ public class FetchDocImpl {
 			Map<String, List<String>> allPage = getAllPage(json);
 			List<String> jsonUrls = allPage.get("json");
 			List<String> pngUrls = allPage.get("png");
-			
+
 			mid.downProgress.setText("下载进度:  " + 0 + "/" + jsonUrls.size());
 
 			for (int index = 0; index < jsonUrls.size(); index++) {
@@ -143,38 +228,37 @@ public class FetchDocImpl {
 	}
 
 	public List<JSONObject> parseBodyStruct(JSONArray body) {
-		List<JSONObject> listWord = new ArrayList<JSONObject>();//排除了空格word，和pic
-		List<JSONObject> listPic = new ArrayList<JSONObject>();//只有有url的pic
+		List<JSONObject> listWord = new ArrayList<JSONObject>();// 排除了空格word，和pic
+		List<JSONObject> listPic = new ArrayList<JSONObject>();// 只有有url的pic
 		for (int i = 0; i < body.size(); i++) {
 			JSONObject obj = body.getJSONObject(i);
 			String type = obj.getString("t");
-			if(type.equals("word")) {
+			if (type.equals("word")) {
 				listWord.add(obj);
-			}else {
-				if(obj.getString("s") == null) {
+			} else {
+				if (obj.getString("s") == null) {
 					listWord.add(obj);
 					continue;
 				}
 				listPic.add(obj);
 			}
 		}
-		//word - p -y
-		//pic - c - iy
+		// word - p -y
+		// pic - c - iy
 		int size = listPic.size();
-		for(int i = 0; i < size; i ++) {
+		for (int i = 0; i < size; i++) {
 			JSONObject pic = listPic.get(0);
 			int j = 0;
 			JSONObject cur = null;
 			JSONObject last = null;
-			for(; j < listWord.size(); j++) {
-				cur  = listWord.get(j);
-				if(cur.getString("c").equals(" ") 
-						|| (cur.getString("t").equals("pic") && cur.getString("s") == null)) 
+			for (; j < listWord.size(); j++) {
+				cur = listWord.get(j);
+				if (cur.getString("c").equals(" ") || (cur.getString("t").equals("pic") && cur.getString("s") == null))
 					continue;
-				if(last == null) {
+				if (last == null) {
 					Double picy = Double.valueOf(pic.getJSONObject("p").getString("y"));
 					Double wordy = Double.valueOf(cur.getJSONObject("p").getString("y"));
-					if(picy < wordy) {
+					if (picy < wordy) {
 						listWord.add(j, pic);
 						listPic.remove(pic);
 						break;
@@ -182,10 +266,10 @@ public class FetchDocImpl {
 					last = cur;
 					continue;
 				}
-				if(j == listWord.size() - 1) {
+				if (j == listWord.size() - 1) {
 					Double picy = Double.valueOf(pic.getJSONObject("p").getString("y"));
 					Double wordy = Double.valueOf(cur.getJSONObject("p").getString("y"));
-					if(picy > wordy) {
+					if (picy > wordy) {
 						listWord.add(j, pic);
 						listPic.remove(pic);
 					}
@@ -199,30 +283,30 @@ public class FetchDocImpl {
 //					System.out.println("null");
 				Double picy0 = getYOrY0(pic);
 				Double wordy = Double.valueOf(cur.getJSONObject("p").getString("y"));
-				if(last.getString("t").equals("pic") && last.getString("s") != null) {
+				if (last.getString("t").equals("pic") && last.getString("s") != null) {
 					Double lastWordy0 = getYOrY0(last);
-					if(picy > lastWordy0 && picy0 < wordy) {
+					if (picy > lastWordy0 && picy0 < wordy) {
 						listWord.add(j, pic);
 						listPic.remove(pic);
 						break;
 					}
 				}
-				if(picy > (lastWordh + lastWordy) && (picy0 < wordy)) {
+				if (picy > (lastWordh + lastWordy) && (picy0 < wordy)) {
 					listWord.add(j, pic);
 					listPic.remove(pic);
 					break;
 				}
 				last = cur;
 			}
-			if(listPic.contains(pic)) {
+			if (listPic.contains(pic)) {
 				Double picy = Double.valueOf(pic.getJSONObject("p").getString("y"));
-				if(last == null) {
+				if (last == null) {
 					listWord.add(j, pic);
 					listPic.remove(pic);
 					continue;
 				}
 				Double wordy = Double.valueOf(last.getJSONObject("p").getString("y"));
-				if(picy > wordy) {
+				if (picy > wordy) {
 					listWord.add(j - 1, pic);
 					listPic.remove(pic);
 				}
@@ -230,10 +314,10 @@ public class FetchDocImpl {
 		}
 		return listWord;
 	}
-	
+
 	public Double getYOrY0(JSONObject pic) {
-		if(pic.getJSONObject("p").getString("y0") == null) {
-			return Double.valueOf(pic.getJSONObject("p").getString("y")) 
+		if (pic.getJSONObject("p").getString("y0") == null) {
+			return Double.valueOf(pic.getJSONObject("p").getString("y"))
 					+ Double.valueOf(pic.getJSONObject("p").getString("h"));
 		}
 		return Double.valueOf(pic.getJSONObject("p").getString("y0"));
@@ -266,7 +350,6 @@ public class FetchDocImpl {
 		}
 	}
 
-
 	public void insert(XWPFDocument doc, XWPFParagraph p, JSONObject c, List<String> pngs)
 			throws InvalidFormatException, IOException {
 		String index = c.getJSONObject("s").getString("pic_file");
@@ -296,8 +379,8 @@ public class FetchDocImpl {
 		String pic = doc.addPictureData(IOUtils.toByteArray(in),
 				org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG);
 		Double[] wh = getWH(w, h);
-		FetchDocImpl.addPictureToRun(run, pic, org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG, wh[0].intValue(),
-				wh[1].intValue());
+		FetchDocImpl.addPictureToRun(run, pic, org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG,
+				wh[0].intValue(), wh[1].intValue());
 	}
 
 	public InputStream bufferedImageToInputStream(File file, int x, int y, int w, int h) throws IOException {
@@ -406,11 +489,6 @@ public class FetchDocImpl {
 		docPr.setId(id);
 		docPr.setName("Picture " + id);
 		docPr.setDescr("Generated");
-	}
-
-	// BDUSS
-	public void run(WebDriver driver, JSONObject json) throws FileNotFoundException {
-		parseAllPage(json);
 	}
 
 	public static void main(String[] args) throws IOException, URISyntaxException {

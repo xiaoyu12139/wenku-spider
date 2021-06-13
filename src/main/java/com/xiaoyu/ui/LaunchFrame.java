@@ -310,7 +310,7 @@ public class LaunchFrame extends JDialog {
 			service.start();
 			ChromeOptions options = new ChromeOptions();
 			options.addArguments("disable-infobars");
-			options.addArguments("-headless");
+//			options.addArguments("-headless");
 			log.info("配置chrome启动方式为无头模式");
 			options.setBinary(new File(StrUtil.chromePath));
 			log.info("正在回调浏览器窗口。");

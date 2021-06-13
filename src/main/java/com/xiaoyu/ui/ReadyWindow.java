@@ -69,7 +69,7 @@ public class ReadyWindow extends JWindow{
 		setPreferredSize(new Dimension(400, 300));
 		pack();
 		setLocationRelativeTo(null);
-		setVisible(true);
+//		setVisible(true);
 	}
 	
 	public boolean run() {

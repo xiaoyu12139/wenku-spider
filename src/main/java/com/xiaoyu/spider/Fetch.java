@@ -1,6 +1,16 @@
 package com.xiaoyu.spider;
 
+import org.apache.http.impl.client.BasicCookieStore;
+import org.apache.http.impl.client.CloseableHttpClient;
+import org.apache.http.impl.client.HttpClients;
+import org.openqa.selenium.WebDriver;
+
+import com.xiaoyu.ui.LaunchFrame;
+
 public interface Fetch {
+	//浏览器驱动
+	WebDriver driver = LaunchFrame.driver;
+	CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
 	/**
 	 * 初始化url的页面
 	 * 

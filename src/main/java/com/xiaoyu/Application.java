@@ -10,13 +10,15 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class Application {
-	
-	  static { System.setProperty("logback.configurationFile", System.getProperty("user.dir") + "\\conf\\logback.xml");}
+
+	static {
+		System.setProperty("logback.configurationFile", System.getProperty("user.dir") + "\\conf\\logback.xml");
+	}
 
 	private LaunchFrame launchFrame;
 	private MainFrame mainFrame;
 	private Boolean flag = null;
-	private ReadyWindow readyWin;
+	public ReadyWindow readyWin;
 
 	public void run() throws InterruptedException {
 		launchFrame = new LaunchFrame();
@@ -25,25 +27,29 @@ public class Application {
 			LaunchFrame.class.wait();
 		}
 		log.info("already runChrome");
-		new Thread(() -> {
-			readyWin = new ReadyWindow(launchFrame);
-			flag = readyWin.run();
-		}).start();
-		int time = 0;
+
+		EventQueue.invokeLater(() -> {
+			synchronized (Application.class) {
+				Application.this.readyWin = new ReadyWindow(launchFrame);
+				Application.this.readyWin.setVisible(true);
+				Application.class.notifyAll();
+			}
+		});
+		synchronized (Application.class) {
+			Application.class.wait();
+			System.out.println("wait over");
+		}
+		flag = readyWin.run();
 		log.info("监听程序界面调用，timeout 为 10分钟");
-		while(time < 1200) {
-			if (flag != null && flag) {
-				log.info("chrome浏览器启动完成");
-				EventQueue.invokeLater(() -> {
-					mainFrame = new MainFrame();
-				});
-				break;
-			}
-			if(flag != null && !flag) {
-				log.info("程序界面启动失败，请检查原因");
-				System.exit(0);
-			}
-			Thread.currentThread().sleep(500);
+		if (flag != null && flag) {
+			log.info("chrome浏览器启动完成");
+			EventQueue.invokeLater(() -> {
+				mainFrame = new MainFrame();
+			});
+		}
+		if (flag != null && !flag) {
+			log.info("程序界面启动失败，请检查原因");
+			System.exit(0);
 		}
 	}
 
