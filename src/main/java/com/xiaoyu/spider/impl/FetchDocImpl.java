@@ -60,13 +60,12 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class FetchDocImpl implements FetchDoc {
 
-	private Mid mid = Mid.getInstance();
-	private CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
-
 	// BDUSS
+	@Override
 	public void run(WebDriver driver, JSONObject json) {
 		try {
 			initModel(json);
+			download();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
@@ -78,32 +77,84 @@ public class FetchDocImpl implements FetchDoc {
 		JSONArray jsons = urls.getJSONArray("json");
 		JSONArray pngs = urls.getJSONArray("png");
 		//初始化jsonurl
-		for (int i = 0; i < jsons.size(); i++) {
-			JSONObject o = jsons.getJSONObject(i);
-			String url = o.getString("pageLoadUrl");
-			String index = o.getString("pageIndex");
-			if(docModel.containsKey(Integer.valueOf(index))) {
-				docModel.get(Integer.valueOf(index)).setJsonUrl(url);
-				continue;
-			}
-			PageModel model = new PageModel();
-			model.setJsonUrl(url);
-			docModel.put(Integer.valueOf(index), model);
-		}
+		initJsonUrl(jsons);
 		//初始化imgurl
-		for (int i = 0; i < pngs.size(); i++) {
-			JSONObject o = jsons.getJSONObject(i);
-			String url = o.getString("pageLoadUrl");
-			String index = o.getString("pageIndex");
-			if(docModel.containsKey(Integer.valueOf(index))) {
-				docModel.get(Integer.valueOf(index)).setImagUrl(url);
-				continue;
-			}
-			PageModel model = new PageModel();
-			model.setImagUrl(url);
-			docModel.put(Integer.valueOf(index), model);
-		}
+		initImgUrl(jsons, pngs);
 		//初始化need
+		initNeed();
+		//排序每页img
+		sortImgs();
+	}
+
+	@Override
+	public void download() {
+		try {
+			XWPFDocument document = new XWPFDocument();
+			String fileName = mid.title.getText();
+			if (fileName == null)
+				fileName = "NB";
+			File file = new File(System.getProperty("user.dir") + "\\downloads\\" + fileName + ".docx");
+			if (!file.getParentFile().exists())
+				file.getParentFile().mkdirs();
+			if (!file.exists())
+				file.createNewFile();
+			FileOutputStream out = new FileOutputStream(file);
+
+			for(int i = 1; i <= docModel.keySet().size(); i++) {
+				log.info("解析重组第" + i + "页的页面结构");
+
+				log.info("根据重组第" + i + "页的页面结构下载该页");
+
+				mid.downProgress.setText("下载进度:  " + i + "/" + docModel.keySet().size());
+			}
+			document.write(out);
+			out.close();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+	@Override
+	public void parseAndDownPage() {
+		
+	}
+	
+	
+	private void sortImgs() {
+		if(docModel.keySet().size() == 0) {
+			log.info("文档有0页");
+			return;
+		}
+		for(int i = 1; i <= docModel.keySet().size(); i++) {
+			PageModel model = docModel.get(i);
+			List<JSONObject> needImage = model.getNeedImage();
+			sortImg(needImage);
+		}
+	}
+
+	private void sortImg(List<JSONObject> needImage) {
+		List<JSONObject> res = new ArrayList<>();
+		//res为空，直接放入
+		//不然从res头开始比较，如果当前图片在被比较的图片（res中的）
+		//的上左就插入他的前面，否则插入到后面
+		//当前图片的w = ix + iw; h = iy + ih; 如果res_w >= w || res_h >= h
+		//那么res在该图片右下
+		for(java.util.Iterator<JSONObject> i = needImage.iterator(); i.hasNext();) {
+			JSONObject next = i.next();
+			JSONObject c = next.getJSONObject("c");
+			int w = Integer.valueOf(c.getString("ix")) + Integer.valueOf(c.getString("iw"));
+			int h = Integer.valueOf(c.getString("iy")) + Integer.valueOf(c.getString("ih"));
+			for(java.util.Iterator<JSONObject> j = res.iterator(); j.hasNext();) {
+				JSONObject resNext = i.next();
+				JSONObject resC = resNext.getJSONObject("c");
+				int resW = Integer.valueOf(c.getString("ix")) + Integer.valueOf(c.getString("iw"));
+				int resH = Integer.valueOf(c.getString("iy")) + Integer.valueOf(c.getString("ih"));
+				
+			}
+		}
+	}
+
+	private void initNeed() {
 		for(java.util.Iterator<Integer> i = docModel.keySet().iterator(); i.hasNext();) {
 			try {
 				PageModel pageModel = docModel.get(i.next());
@@ -128,36 +179,36 @@ public class FetchDocImpl implements FetchDoc {
 				e.printStackTrace();
 			}
 		}
-		//调整每一页里面的需要裁剪部分的顺序，从上到下，从左到右
-		
 	}
 
-	@Override
-	public void parseAndDownPage() {
-		// TODO Auto-generated method stub
-
-	}
-
-	@Override
-	public void download() {
-		// TODO Auto-generated method stub
-
-	}
-
-	// 根据页面源码得到，pageData下面的描述文档的内容
-	public String parseHtml(String html) {
-		Document doc = Jsoup.parse(html);
-		Elements scripts = doc.select("script");
-		for (Element e : scripts) {
-			String text = e.data();
-			if (!text.equals("")) {
-				Pattern p = Pattern.compile("var pageData\\s*=\\s*(.*);");
-				Matcher m = p.matcher(text);
-				if (m.find())
-					return m.group(1);
+	private void initImgUrl(JSONArray jsons, JSONArray pngs) {
+		for (int i = 0; i < pngs.size(); i++) {
+			JSONObject o = jsons.getJSONObject(i);
+			String url = o.getString("pageLoadUrl");
+			String index = o.getString("pageIndex");
+			if(docModel.containsKey(Integer.valueOf(index))) {
+				docModel.get(Integer.valueOf(index)).setImagUrl(url);
+				continue;
 			}
+			PageModel model = new PageModel();
+			model.setImagUrl(url);
+			docModel.put(Integer.valueOf(index), model);
 		}
-		return "";
+	}
+
+	private void initJsonUrl(JSONArray jsons) {
+		for (int i = 0; i < jsons.size(); i++) {
+			JSONObject o = jsons.getJSONObject(i);
+			String url = o.getString("pageLoadUrl");
+			String index = o.getString("pageIndex");
+			if(docModel.containsKey(Integer.valueOf(index))) {
+				docModel.get(Integer.valueOf(index)).setJsonUrl(url);
+				continue;
+			}
+			PageModel model = new PageModel();
+			model.setJsonUrl(url);
+			docModel.put(Integer.valueOf(index), model);
+		}
 	}
 
 	//pageIndex

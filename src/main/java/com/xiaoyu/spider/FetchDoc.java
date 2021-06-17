@@ -11,6 +11,7 @@ import org.openqa.selenium.WebDriver;
 
 import com.alibaba.fastjson.JSONObject;
 import com.xiaoyu.model.PageModel;
+import com.xiaoyu.ui.panel.Mid;
 
 public interface FetchDoc {
 	//key - 页数 	value - 当前页的数据模型
@@ -20,6 +21,8 @@ public interface FetchDoc {
 	
 	//操作数据到本地word文件
 	XWPFDocument document = new XWPFDocument();
+	
+	Mid mid = Mid.getInstance();
 	
 	/**
 	 * 获取该url下的文档每一页的PageModel存到对应页数的docModel里面
