@@ -1,7 +1,6 @@
 package com.xiaoyu.model;
 
-import java.util.ArrayList;
-import java.util.List;
+import java.util.LinkedList;
 
 import com.alibaba.fastjson.JSONObject;
 
@@ -11,5 +10,5 @@ import lombok.Data;
 public class PageModel {
 	private String jsonUrl;
 	private String imagUrl;
-	private List<JSONObject> needImage = new ArrayList<>();
+	private LinkedList<JSONObject> needImage = new LinkedList<>();
 }

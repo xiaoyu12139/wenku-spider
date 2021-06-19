@@ -32,7 +32,7 @@ public interface FetchDoc {
 	/**
 	 * 重组当前页，并下载当前页
 	 */
-	void parseAndDownPage();
+	void parseAndDownPage(XWPFDocument document, PageModel pageModel, int pageIndex);
 	
 	/**
 	 * 解析完成后开始下载文档
