@@ -8,21 +8,16 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.net.URISyntaxException;
-import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Map;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import javax.imageio.ImageIO;
 
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.util.EntityUtils;
-import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
 import org.apache.poi.util.IOUtils;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.apache.poi.xwpf.usermodel.XWPFParagraph;
@@ -37,6 +32,7 @@ import org.openxmlformats.schemas.drawingml.x2006.wordprocessingDrawing.CTInline
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.xiaoyu.model.DocInfoType;
 import com.xiaoyu.model.PageModel;
 import com.xiaoyu.spider.FetchDoc;
 
@@ -44,11 +40,14 @@ import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
 public class FetchDocImpl implements FetchDoc {
+	
+	public DocInfoType docInfoType;
 
 	// BDUSS
 	@Override
-	public void run(WebDriver driver, JSONObject json) {
+	public void run(WebDriver driver, JSONObject json, DocInfoType docInfoType) {
 		try {
+			this.docInfoType = docInfoType;
 			initModel(json);
 			download();
 		} catch (Exception e) {
@@ -58,7 +57,7 @@ public class FetchDocImpl implements FetchDoc {
 
 	@Override
 	public void initModel(JSONObject json) {
-		JSONObject urls = json.getJSONObject("readerInfo2019").getJSONObject("htmlUrls");
+		JSONObject urls = getUrls(json);
 		JSONArray jsons = urls.getJSONArray("json");
 		JSONArray pngs = urls.getJSONArray("png");
 		// 初始化jsonurl
@@ -78,7 +77,7 @@ public class FetchDocImpl implements FetchDoc {
 			String fileName = mid.title.getText();
 			if (fileName == null)
 				fileName = "NB";
-			File file = new File(System.getProperty("user.dir") + "\\downloads\\" + fileName + ".docx");
+			File file = new File(System.getProperty("user.dir") + "\\downloads\\" + fileName.substring(5) + ".docx");
 			if (!file.getParentFile().exists())
 				file.getParentFile().mkdirs();
 			if (!file.exists())
@@ -103,6 +102,10 @@ public class FetchDocImpl implements FetchDoc {
 			String imagUrl = pageModel.getImagUrl();
 			LinkedList<JSONObject> needImage = pageModel.getNeedImage();
 			String source = EntityUtils.toString(client.execute(new HttpGet(jsonUrl)).getEntity());
+			Pattern pa = Pattern.compile("wenku_" + pageIndex + "\\((.*)\\)");
+			Matcher m = pa.matcher(source);
+			if(m.find())
+				source = m.group(1);
 			JSONArray body = JSON.parseObject(source).getJSONArray("body");
 			JSONObject pre = null;
 			JSONObject cur = null;
@@ -315,19 +318,24 @@ public class FetchDocImpl implements FetchDoc {
 	private void initNeed() {
 		for (java.util.Iterator<Integer> i = docModel.keySet().iterator(); i.hasNext();) {
 			try {
-				PageModel pageModel = docModel.get(i.next());
+				int index = i.next();
+				PageModel pageModel = docModel.get(index);
 				String jsonUrl = pageModel.getJsonUrl();
 				if (jsonUrl.equals(""))
 					continue;
 				String str = EntityUtils.toString(client.execute(new HttpGet(jsonUrl)).getEntity());
+				Pattern p = Pattern.compile("wenku_" + index + "\\((.*)\\)");
+				Matcher m = p.matcher(str);
+				if(m.find())
+					str = m.group(1);
 				JSONObject page = JSON.parseObject(str);
 				JSONArray body = page.getJSONArray("body");
 				for (int j = 0; j < body.size(); j++) {
 					JSONObject obj = body.getJSONObject(j);
 					if (obj.getString("t").equals("pic") && obj.getString("s") != null) {
 						String tmp = obj.getJSONObject("s").getString("pic_file");
-						Pattern p = Pattern.compile("_([0-9]*)_");
-						Matcher m = p.matcher(tmp);
+						p = Pattern.compile("_([0-9]*)_");
+						m = p.matcher(tmp);
 						if (m.find())
 							tmp = m.group(1);
 						if (docModel.containsKey(Integer.valueOf(tmp)))
@@ -369,6 +377,17 @@ public class FetchDocImpl implements FetchDoc {
 			docModel.put(Integer.valueOf(index), model);
 		}
 	}
+	
+	private JSONObject getUrls(JSONObject json) {
+		if(docInfoType ==DocInfoType.docInfo2019) {
+			return json.getJSONObject("readerInfo2019").getJSONObject("htmlUrls");
+		}
+		if(docInfoType ==DocInfoType.docInfo) {
+			return json.getJSONObject("readerInfo").getJSONObject("htmlUrls");
+		}
+		return null;
+	}
+
 
 	/**
 	 * 因POI 3.8自带的BUG 导致添加进的图片不显示，只有一个图片框，将图片另存为发现里面的图片是一个PNG格式的透明图片 这里自定义添加图片的方法
@@ -427,6 +446,7 @@ public class FetchDocImpl implements FetchDoc {
 		docPr.setName("Picture " + id);
 		docPr.setDescr("Generated");
 	}
+	
 
 	public static void main(String[] args) throws IOException, URISyntaxException {
 		FetchDocImpl main = new FetchDocImpl();

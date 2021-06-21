@@ -10,6 +10,7 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.openqa.selenium.WebDriver;
 
 import com.alibaba.fastjson.JSONObject;
+import com.xiaoyu.model.DocInfoType;
 import com.xiaoyu.model.PageModel;
 import com.xiaoyu.ui.panel.Mid;
 
@@ -39,6 +40,6 @@ public interface FetchDoc {
 	 */
 	void download();
 	
-	void run(WebDriver driver, JSONObject json);
+	void run(WebDriver driver, JSONObject json, DocInfoType docInfoType);
 
 }

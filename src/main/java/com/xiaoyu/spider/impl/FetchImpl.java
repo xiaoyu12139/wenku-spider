@@ -10,6 +10,7 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.Writer;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Map;
@@ -36,6 +37,7 @@ import org.openqa.selenium.chrome.ChromeOptions;
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
+import com.xiaoyu.model.DocInfoType;
 import com.xiaoyu.model.DownloadModel;
 import com.xiaoyu.spider.Fetch;
 import com.xiaoyu.ui.LaunchFrame;
@@ -47,38 +49,40 @@ import com.xiaoyu.utils.StrUtil;
 import lombok.extern.slf4j.Slf4j;
 
 @Slf4j
-public class FetchImpl implements Fetch{
+public class FetchImpl implements Fetch {
 
 	private DownloadModel downloadModel = DownloadModel.getInstance();
 	private Map<String, String> map = null;
-	
+	private DocInfoType docInfoType = DocInfoType.docInfo;
 
 	@Override
 	public void initPage() {
 		try {
-			//请求页面
+			// 请求页面
 			requestPage();
-			//读取本地cookie,检验cookie
+			// 读取本地cookie,检验cookie
 			boolean overdue = readLocalCookie();
-			//cookie过器重新开启浏览器，并获取到用户输入的密码，进行登录
-			//登录成功后，将该登录成功的页面的cookie记录到本地，关闭当前临时浏览器
-			//重新读取本地cookie，并刷新当前页面
-			if(!overdue)
-				if(!reloadCookie()) return ;
+			// cookie过器重新开启浏览器，并获取到用户输入的密码，进行登录
+			// 登录成功后，将该登录成功的页面的cookie记录到本地，关闭当前临时浏览器
+			// 重新读取本地cookie，并刷新当前页面
+			if (!overdue)
+				if (!reloadCookie())
+					return;
 			checkTypeAndInvoke();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
 	}
-	
+
 	private void requestPage() {
 		log.info("浏览器窗口回调完成，正在请求页面：" + downloadModel.getUrl());
 		driver.get(downloadModel.getUrl());
 		log.info("页面请求完成。");
 	}
-	
+
 	/**
 	 * cookie失效返回false
+	 * 
 	 * @return
 	 */
 	private boolean readLocalCookie() {
@@ -97,7 +101,7 @@ public class FetchImpl implements Fetch{
 		log.info("开始校验 cookie.");
 		return checkCookie(pageData);
 	}
-	
+
 	private boolean reloadCookie() {
 		String pageSource = driver.getPageSource();
 		String pageData = parseHtml(pageSource);
@@ -126,33 +130,73 @@ public class FetchImpl implements Fetch{
 		String pageSource = driver.getPageSource();
 		String pageData = parseHtml(pageSource);
 		JSONObject json = JSON.parseObject(pageData);
+		checkDocInfoType(json);
 		final JSONObject temp = json;
 		new Thread(() -> {
 			log.info("设置文档信息");
 			setExplain(temp);
 		}).start();
 		log.info("实例化文档抓取器-FetchDoc");
-		new FetchDocImpl().run(driver, json);
+		new FetchDocImpl().run(driver, json, docInfoType);
 		log.info("本次抓取完成");
 	}
 
+	private void checkDocInfoType(JSONObject json) {
+		if (json.getJSONObject("docInfo2019") != null)
+			docInfoType = DocInfoType.docInfo2019;
+	}
 
 	/**
 	 * 设置mid面板中显示的该文档的一些信息
 	 */
 	private void setExplain(JSONObject json) {
 		Mid mid = Mid.getInstance();
-		mid.title.setText("标题:  " + json.getJSONObject("docInfo2019").getJSONObject("doc_info").getString("title"));
-		String temp = json.getJSONObject("docInfo2019").getJSONObject("doc_info").getString("create_time");
-		Date date = new Date();
-		long milliSecond = Long.valueOf(temp);
-		date.setTime(milliSecond);
+		if (docInfoType == DocInfoType.docInfo) {
+			JSONObject info = json.getJSONObject("viewBiz").getJSONObject("docInfo");
+			mid.title.setText("标题:  " + info.getString("title"));
+			mid.type.setText("文档类型:  " + info.getString("fileType"));
+			String temp = info.getString("showCreateTime");
+			mid.createTime.setText("创建时间:  " + sdfDate(temp));
+			JSONArray tags = json.getJSONObject("viewBiz").getJSONArray("tags");
+			setMidTags(mid, tags);
+		}
+		if(docInfoType == DocInfoType.docInfo2019) {
+			JSONObject info = json.getJSONObject("docInfo2019").getJSONObject("doc_info");
+			mid.title.setText("标题:  " + info.getString("title"));
+			String temp = info.getString("create_time");
+			mid.createTime.setText("创建时间:  " + sdfDate(temp));
+			mid.type.setText("文档类型:  " + info.getString("typeName"));
+			JSONArray tags = json.getJSONObject("docInfo2019").getJSONArray("tags");
+			setMidTags(mid, tags);
+		}
+	}
+
+	private String sdfDate(String temp) {
+		String res = null;
 		SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
-		mid.createTime.setText("创建时间:  " + sdf.format(date));
-//		mid.downProgress.setText(text);
-		mid.type.setText("文档类型:  " + json.getJSONObject("docInfo2019").getJSONObject("doc_info").getString("typeName"));
+		if (docInfoType == DocInfoType.docInfo) {
+			try {
+				res = sdf.format(sdf.parse(temp));
+			} catch (ParseException e) {
+				sdf = new SimpleDateFormat("yyyy-MM-dd");
+				try {
+					res = sdf.format(sdf.parse(temp));
+				} catch (ParseException e1) {
+					return null;
+				}
+			}
+		}
+		if (docInfoType == DocInfoType.docInfo2019) {
+			Date date = new Date();
+			long milliSecond = Long.valueOf(temp);
+			date.setTime(milliSecond);
+			res = sdf.format(date);
+		}
+		return res;
+	}
+
+	private void setMidTags(Mid mid, JSONArray tags) {
 		String res = "";
-		JSONArray tags = json.getJSONObject("docInfo2019").getJSONArray("tags");
 		for (int i = 0; i < tags.size(); i++) {
 			JSONObject o = (JSONObject) tags.get(i);
 			res += o.getString("tag");
@@ -161,10 +205,19 @@ public class FetchImpl implements Fetch{
 			res += "、";
 		}
 		mid.tags.setText("标签:  " + res);
+
+	}
+
+	private JSONObject getDocInfo(JSONObject json) {
+		JSONObject tmp = json.getJSONObject("docInfo2019");
+		if (tmp == null) {
+			tmp = json.getJSONObject("docInfo");
+		}
+		return tmp;
 	}
 
 	private boolean login(WebDriver driver) {
-		if(!loginPage(driver, false)) {
+		if (!loginPage(driver, false)) {
 			log.info("检测到可能需要验证，正在重新调用chrome获取cookie");
 			return headChromelogin(driver);
 		}
@@ -201,14 +254,14 @@ public class FetchImpl implements Fetch{
 		driver.switchTo().window(main);
 		log.info("切换回主窗口，同时判断是否登录状态。");
 		int wtime = 10;
-		if(head)
+		if (head)
 			wtime = 120;
 		int index = 0;
 		while (index < wtime) {
 			if (checkCookie(parseHtml(driver.getPageSource()))) {
 				try {
 					File f = new File(System.getProperty("user.dir") + "\\conf\\json.txt");
-					if(!f.exists()) 
+					if (!f.exists())
 						f.createNewFile();
 					WebDriver.Options manage = driver.manage();
 					Cookie c = manage.getCookieNamed("BDUSS");
@@ -246,7 +299,8 @@ public class FetchImpl implements Fetch{
 			file = new File(path + "\\chromedriver.exe");
 			System.setProperty("webdriver.chrome.driver", file.getAbsolutePath());
 			// BDUSS
-			ChromeDriverService service = new ChromeDriverService.Builder().usingDriverExecutable(file).usingAnyFreePort().build();
+			ChromeDriverService service = new ChromeDriverService.Builder().usingDriverExecutable(file)
+					.usingAnyFreePort().build();
 			service.start();
 			ChromeOptions options = new ChromeOptions();
 			options.addArguments("disable-infobars");
@@ -289,15 +343,15 @@ public class FetchImpl implements Fetch{
 		}
 	}
 
-	//判断坐上角是否有登录标志符
+	// 判断坐上角是否有登录标志符
 	private boolean checkCookie(String pageData) {
-        try {
-            driver.findElement(By.cssSelector("div[class~='login']"));
-            return true;
-        } catch (Exception e) {
-            System.out.println("不存在此元素");
-            return false;
-        }
+		try {
+			driver.findElement(By.cssSelector("div[class~='login']"));
+			return true;
+		} catch (Exception e) {
+			System.out.println("不存在此元素");
+			return false;
+		}
 	}
 
 	public String parseHtml(String html) {
