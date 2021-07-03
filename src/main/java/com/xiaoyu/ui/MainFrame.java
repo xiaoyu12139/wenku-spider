@@ -1,10 +1,11 @@
 package com.xiaoyu.ui;
 
 import java.awt.BorderLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
 import java.awt.event.WindowAdapter;
 import java.awt.event.WindowEvent;
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -14,6 +15,7 @@ import javax.swing.JFrame;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
+import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.WindowConstants;
@@ -41,8 +43,21 @@ public class MainFrame extends JFrame{
 		setLayout(new BorderLayout());
 		JMenu file = new JMenu("file");
 		JMenu help = new JMenu("help");
-		JMenuItem item1 = new JMenuItem("item1");
-		JMenuItem item2 = new JMenuItem("item2");
+		JMenuItem item1 = new JMenuItem("下载目录");
+		JMenuItem item2 = new JMenuItem("帮组文档");
+		item1.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JOptionPane.showMessageDialog(mainPanel, System.getProperty("user.dir") + "\\downloads", "下载的文件储存路径",JOptionPane.WARNING_MESSAGE); 
+			}
+		});
+		item2.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent e) {
+				JOptionPane.showMessageDialog(mainPanel, "首次使用，或者长期未使用要登录，登录采用qq账号登录，保证存在qq注册过正常登录百度账号。"
+						+ "\n登录后，将百度文库文档url复制过来，点击download即可。", "使用操作",JOptionPane.WARNING_MESSAGE); 
+			}
+		});
 		file.add(item1);
 		help.add(item2);
 		menuBar.add(file);

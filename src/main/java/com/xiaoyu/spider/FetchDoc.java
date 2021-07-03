@@ -15,8 +15,6 @@ import com.xiaoyu.model.PageModel;
 import com.xiaoyu.ui.panel.Mid;
 
 public interface FetchDoc {
-	//key - 页数 	value - 当前页的数据模型
-	Map<Integer, PageModel> docModel = new HashMap<>();
 	
 	CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
 	

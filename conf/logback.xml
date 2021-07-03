@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration scan="true" scanPeriod="1 seconds"
+	debug="true">
+	<logger name="org.apache" level="INFO" />
+    <logger name="org.apache.http.wire" level="INFO" />
+    <logger name="org.apache.http.headers" level="INFO" />
+    
+	<property name="LOG_FILE" value="./error.log" />
+	<property name="appName" value="wenku-spider" />
+	<contextName>${appName}</contextName>
+	<timestamp key="byDate" datePattern="yyyyMMdd" />
+	<appender name="STDOUT"
+		class="ch.qos.logback.core.ConsoleAppender">
+		<encoder>
+			<pattern>%d{HH:mm:ss.SSS} %-5level %logger{50} - %msg%n</pattern>
+		</encoder>
+	</appender>
+	<appender name="FILE" class="ch.qos.logback.core.FileAppender">
+		<file>${LOG_FILE}</file>
+		<append>true</append>
+		<immediateFlush>true</immediateFlush>
+		<encoder>
+			<pattern>%msg%n  -  %-4relative [%thread] %-5level %logger{35}
+			</pattern>
+		</encoder>
+	</appender>
+	<root level="INFO">
+		<appender-ref ref="STDOUT" />
+		<appender-ref ref="FILE" />
+	</root>
+</configuration>

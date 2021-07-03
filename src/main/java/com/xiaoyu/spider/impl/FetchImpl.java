@@ -1,26 +1,30 @@
 package com.xiaoyu.spider.impl;
 
+import java.awt.image.BufferedImage;
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import org.apache.http.impl.client.BasicCookieStore;
-import org.apache.http.impl.client.CloseableHttpClient;
-import org.apache.http.impl.client.HttpClients;
+import javax.imageio.ImageIO;
+
+import org.apache.http.client.ClientProtocolException;
+import org.apache.poi.openxml4j.exceptions.InvalidFormatException;
+import org.apache.poi.util.IOUtils;
+import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.jsoup.Jsoup;
 import org.jsoup.nodes.Document;
 import org.jsoup.nodes.Element;
@@ -40,7 +44,6 @@ import com.alibaba.fastjson.JSONObject;
 import com.xiaoyu.model.DocInfoType;
 import com.xiaoyu.model.DownloadModel;
 import com.xiaoyu.spider.Fetch;
-import com.xiaoyu.ui.LaunchFrame;
 import com.xiaoyu.ui.panel.InputDialog;
 import com.xiaoyu.ui.panel.Mid;
 import com.xiaoyu.utils.CookieUtil;
@@ -60,6 +63,8 @@ public class FetchImpl implements Fetch {
 		try {
 			// 请求页面
 			requestPage();
+			if (!isNeedLogin())
+				return;
 			// 读取本地cookie,检验cookie
 			boolean overdue = readLocalCookie();
 			// cookie过器重新开启浏览器，并获取到用户输入的密码，进行登录
@@ -72,6 +77,83 @@ public class FetchImpl implements Fetch {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+	}
+
+	private boolean isNeedLogin() {
+		try {
+			driver.findElement(By.cssSelector("div[class~='goto-page']"));
+			return true;
+		} catch (Exception e) {
+			System.out.println("不存在此元素:goto-page");
+			mid.title.setText(" ");
+			mid.createTime.setText(" ");
+			mid.tags.setText(" ");
+			mid.type.setText(" ");
+			// download
+			Document doc = Jsoup.parse(driver.getPageSource());
+			Element title = doc.getElementsByTag("title").first();
+			Element root = doc.select("div[class=\"fr-view\"]").first();
+			Elements ps = root.getElementsByTag("p");
+			try {
+				XWPFDocument document = new XWPFDocument();
+				String fileName = title.wholeText();
+				if (fileName == null)
+					fileName = "NB";
+				File file = new File(System.getProperty("user.dir") + "\\downloads\\" + fileName + ".docx");
+				if (!file.getParentFile().exists())
+					file.getParentFile().mkdirs();
+				if (!file.exists())
+					file.createNewFile();
+				FileOutputStream out = new FileOutputStream(file);
+				int index = 1;
+				for (Iterator<Element> i = ps.iterator(); i.hasNext();) {
+					Element next = i.next();
+					if (!pageDown(next, document))
+						document.createParagraph().createRun().setText(next.wholeText());
+					mid.downProgress.setText("下载进度:  " + index++ + "/" + ps.size());
+				}
+				log.info("下载完成");
+				document.write(out);
+				out.close();
+			} catch (Exception ee) {
+				ee.printStackTrace();
+			}
+			return false;
+		}
+	}
+
+	public boolean pageDown(Element next, XWPFDocument document)
+			throws ClientProtocolException, IOException, InvalidFormatException {
+		Elements imgs = next.getElementsByTag("img");
+		if (imgs.size() > 0) {
+			for (Iterator<Element> i = imgs.iterator(); i.hasNext();) {
+				try {
+					Element img = i.next();
+					log.info("下载img");
+					String url = img.attr("src");
+					File temp = new File(System.getProperty("user.dir") + "\\tmp");
+					if (!temp.exists())
+						temp.mkdir();
+					File tempPic = new File(temp.getAbsoluteFile() + "\\tmp.png");
+					new FetchDocImpl().downloadPic(url, tempPic);
+					ByteArrayOutputStream os = new ByteArrayOutputStream();
+					BufferedImage image = ImageIO.read(tempPic);
+					ImageIO.write(image, "png", os);
+					Double[] wh = new FetchDocImpl().getWH(new Double(image.getWidth()), new Double(image.getHeight()));
+					String pic = document.addPictureData(
+							IOUtils.toByteArray(new ByteArrayInputStream(os.toByteArray())),
+							org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG);
+					FetchDocImpl.addPictureToRun(document.createParagraph().createRun(), pic,
+							org.apache.poi.xwpf.usermodel.Document.PICTURE_TYPE_PNG, wh[0].intValue(),
+							wh[1].intValue());
+				} catch (Exception e) {
+					e.printStackTrace();
+					return false;
+				}
+			}
+			return true;
+		}
+		return false;
 	}
 
 	private void requestPage() {
@@ -137,7 +219,32 @@ public class FetchImpl implements Fetch {
 			setExplain(temp);
 		}).start();
 		log.info("实例化文档抓取器-FetchDoc");
-		new FetchDocImpl().run(driver, json, docInfoType);
+		if (docInfoType == DocInfoType.docInfo) {
+			JSONObject info = json.getJSONObject("viewBiz").getJSONObject("docInfo");
+			String type = info.getString("fileType");
+			if (type.equals("txt")) {
+				new FetchTxtImpl().run(driver, pageSource, docInfoType);
+			} else if (type.equals("word")) {
+				new FetchDocImpl().run(driver, json, docInfoType);
+			} else if (type.equals("ppt")) {
+				new FetchPttImpl().run(driver, json, docInfoType);
+			} else if (type.equals("pdf")) {
+				new FetchPdfImpl().run(driver, json, docInfoType);
+			}
+		}
+		if (docInfoType == DocInfoType.docInfo2019) {
+			JSONObject info = json.getJSONObject("docInfo2019").getJSONObject("doc_info");
+			String type = info.getString("typeName");
+			if (type.equals("txt")) {
+				new FetchTxtImpl().run(driver, pageSource, docInfoType);
+			} else if (type.equals("word")) {
+				new FetchDocImpl().run(driver, json, docInfoType);
+			} else if (type.equals("ppt")) {
+				new FetchPttImpl().run(driver, json, docInfoType);
+			} else if (type.equals("pdf")) {
+				new FetchPdfImpl().run(driver, json, docInfoType);
+			}
+		}
 		log.info("本次抓取完成");
 	}
 
@@ -160,7 +267,7 @@ public class FetchImpl implements Fetch {
 			JSONArray tags = json.getJSONObject("viewBiz").getJSONArray("tags");
 			setMidTags(mid, tags);
 		}
-		if(docInfoType == DocInfoType.docInfo2019) {
+		if (docInfoType == DocInfoType.docInfo2019) {
 			JSONObject info = json.getJSONObject("docInfo2019").getJSONObject("doc_info");
 			mid.title.setText("标题:  " + info.getString("title"));
 			String temp = info.getString("create_time");

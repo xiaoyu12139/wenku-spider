@@ -1,5 +1,6 @@
 package com.xiaoyu.ui.listener;
 
+import java.awt.CardLayout;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.KeyEvent;
@@ -7,9 +8,12 @@ import java.awt.event.KeyListener;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
+import javax.swing.JButton;
+
 import com.xiaoyu.model.DownloadModel;
 import com.xiaoyu.spider.Fetch;
 import com.xiaoyu.spider.impl.FetchImpl;
+import com.xiaoyu.ui.panel.Buttom;
 import com.xiaoyu.ui.panel.Top;
 
 import lombok.extern.slf4j.Slf4j;
@@ -20,25 +24,38 @@ public class URLListener implements KeyListener, ActionListener {
 	private Top top;
 	private DownloadModel downloadModel = DownloadModel.getInstance();
 	private static boolean isrun = false;
-
+	private Thread thread = null;
+	Buttom buttom = Buttom.getInstance();
+	
 	public URLListener(Top top) {
 		this.top = top;
 	}
 
 	@Override
 	public void actionPerformed(ActionEvent e) {
-		if(!isrun) {
+		JButton o = (JButton)e.getSource();
+		if(o.getText().equals("download")) {
+			log.info("start");
 			isrun = true;
-			execute();
+			CardLayout cl = top.cl;
+			cl.next(top.down);
+			thread = execute();
+			if(thread != null) {
+				log.info("开启一个新的线程进行抓取任务");
+			}else {
+				cl.next(top.down);
+				log.info("停止抓取任务");
+			}
+		}else {
 			isrun = false;
+			CardLayout cl = top.cl;
+			cl.next(top.down);
+			if(thread != null) {
+				thread.stop();
+				log.info("停止抓取任务线程");
+				thread = null;
+			}
 		}
-		log.info("当前有抓取任务尚未完成，耐心等待完成后在进行抓取");
-			// 在启动程序时，就需要校验cookie是否合法，并且这时需要启动浏览器，后面的抓取操作
-			// 只需要新建标签页
-			// 每次抓取前，校验cookie是否合法，不合法就在弹出窗口，当前cookie过去，请在弹出的浏览器页面登录
-			// 登录完成后回到gui中点击确认
-			// 点击确认就代表在页面登录过了，进行校验是否成功登录。否的话，再次弹出刚才的窗口
-			// 点击取消就关闭浏览器
 	}
 
 	@Override
@@ -46,18 +63,23 @@ public class URLListener implements KeyListener, ActionListener {
 
 	}
 
-	public void execute() {
+	public Thread execute() {
 		boolean flag = receiveURL();
 		if (!flag)
-			return ;
-		new Thread(() -> {
+			return null;
+		Thread thread = new Thread(() -> {
 			try {
 				Fetch fetch = new FetchImpl();
 				fetch.initPage();
+				isrun = false;
+				CardLayout cl = top.cl;
+				cl.next(top.down);
 			} catch (Exception e1) {
 				e1.printStackTrace();
 			}
-		}).start();
+		});
+		thread.start();
+		return thread;
 	}
 	
 	@Override
@@ -65,8 +87,9 @@ public class URLListener implements KeyListener, ActionListener {
 		if (e.getKeyCode() == 10) {
 			if(!isrun) {
 				isrun = true;
-				execute();
-				isrun = false;
+				CardLayout cl = top.cl;
+				cl.next(top.down);
+				thread = execute();
 			}
 			log.info("当前有抓取任务尚未完成，耐心等待完成后在进行抓取");
 		}

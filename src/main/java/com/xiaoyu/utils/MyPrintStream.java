@@ -10,6 +10,7 @@ public class MyPrintStream extends PrintStream {
 
 	private JTextArea text;
 	private StringBuffer sb = new StringBuffer();
+	private boolean clear = false;
 
 	public MyPrintStream(OutputStream out, JTextArea text) {
 		super(out);

@@ -20,7 +20,7 @@
 		<append>true</append>
 		<immediateFlush>true</immediateFlush>
 		<encoder>
-			<pattern>%-4relative [%thread] %-5level %logger{35} - %msg%n
+			<pattern>%msg%n  -  %-4relative [%thread] %-5level %logger{35}
 			</pattern>
 		</encoder>
 	</appender>

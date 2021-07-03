@@ -9,7 +9,7 @@ public class MainPanel extends JPanel{
 	
 	private Top top = new Top();
 	private Mid mid = Mid.getInstance();
-	private Buttom buttom = new Buttom();
+	private Buttom buttom = Buttom.getInstance();
 
 	public MainPanel() {
 //		top.setBackground(Color.black);

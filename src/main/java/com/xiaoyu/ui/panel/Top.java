@@ -1,5 +1,6 @@
 package com.xiaoyu.ui.panel;
 
+import java.awt.CardLayout;
 import java.awt.FlowLayout;
 
 import javax.swing.BorderFactory;
@@ -15,13 +16,17 @@ public class Top extends JPanel{
 	
 	public JTextField url = new JTextField("输入百度文库文章的url……", 55);
 	private JLabel label = new JLabel("URL：");
-	private JButton enter = new JButton("download");
+	private JButton start = new JButton("download");
+	private JButton stop = new JButton("  stop  ");
+	public JPanel down = new JPanel();
+	public CardLayout cl = new CardLayout();
 	
 	public Top() {
 		setLayout(new FlowLayout());
 		
 		URLListener l = new URLListener(this);
-		enter.addActionListener(l);
+		start.addActionListener(l);
+		stop.addActionListener(l);
 		url.addKeyListener(l);
 		
 		Box box = Box.createHorizontalBox();
@@ -30,7 +35,10 @@ public class Top extends JPanel{
 		box.add(label);
 		box.add(url);
 		box.add(Box.createHorizontalStrut(5));
-		box.add(enter);
+		down.setLayout(cl);
+		down.add(start);
+		down.add(stop);
+		box.add(down);
 		box.add(Box.createHorizontalStrut(5));
 		add(box);
 	}

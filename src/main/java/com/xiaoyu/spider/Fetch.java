@@ -6,11 +6,13 @@ import org.apache.http.impl.client.HttpClients;
 import org.openqa.selenium.WebDriver;
 
 import com.xiaoyu.ui.LaunchFrame;
+import com.xiaoyu.ui.panel.Mid;
 
 public interface Fetch {
 	//浏览器驱动
 	WebDriver driver = LaunchFrame.driver;
 	CloseableHttpClient client = HttpClients.custom().setDefaultCookieStore(new BasicCookieStore()).build();
+	Mid mid = Mid.getInstance();
 	/**
 	 * 初始化url的页面
 	 * 
