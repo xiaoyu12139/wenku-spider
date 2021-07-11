@@ -38,6 +38,7 @@ import org.openxmlformats.schemas.drawingml.x2006.wordprocessingDrawing.CTInline
 
 import com.alibaba.fastjson.JSON;
 import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONException;
 import com.alibaba.fastjson.JSONObject;
 import com.xiaoyu.model.DocInfoType;
 import com.xiaoyu.model.PageModel;
@@ -123,7 +124,13 @@ public class FetchDocImpl implements FetchDoc {
 			Matcher m = pa.matcher(source);
 			if (m.find())
 				source = m.group(1);
-			JSONArray body = JSON.parseObject(source).getJSONArray("body");
+			JSONArray body = null;
+			try {
+				body = JSON.parseObject(source).getJSONArray("body");
+			} catch (Exception e) {
+				log.info("syntax error");
+				return ;
+			}
 			XWPFParagraph p = document.createParagraph();
 			JSONArray tmp = new JSONArray();
 			for (int i = 0; i < body.size(); i++) {
@@ -428,7 +435,13 @@ public class FetchDocImpl implements FetchDoc {
 				Matcher m = p.matcher(str);
 				if (m.find())
 					str = m.group(1);
-				JSONObject page = JSON.parseObject(str);
+				JSONObject page = null;
+				try {
+					page = JSON.parseObject(str);
+				} catch (JSONException e) {
+					log.info("syntax error");
+					return ;
+				}
 				JSONArray body = page.getJSONArray("body");
 				for (int j = 0; j < body.size(); j++) {
 					JSONObject obj = body.getJSONObject(j);

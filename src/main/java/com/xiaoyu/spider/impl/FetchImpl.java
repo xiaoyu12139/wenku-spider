@@ -12,8 +12,10 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -92,7 +94,7 @@ public class FetchImpl implements Fetch {
 			// download
 			Document doc = Jsoup.parse(driver.getPageSource());
 			Element title = doc.getElementsByTag("title").first();
-			Element root = doc.select("div[class=\"fr-view\"]").first();
+			Element root = doc.getElementById("reader-container");
 			Elements ps = root.getElementsByTag("p");
 			try {
 				XWPFDocument document = new XWPFDocument();
@@ -181,7 +183,7 @@ public class FetchImpl implements Fetch {
 		String pageData = parseHtml(pageSource);
 		log.info("抓取到pageData:" + pageData);
 		log.info("开始校验 cookie.");
-		return checkCookie(pageData);
+		return checkCookie(pageSource);
 	}
 
 	private boolean reloadCookie() {
@@ -328,7 +330,7 @@ public class FetchImpl implements Fetch {
 			log.info("检测到可能需要验证，正在重新调用chrome获取cookie");
 			return headChromelogin(driver);
 		}
-		return false;
+		return true;
 	}
 
 	public boolean loginPage(WebDriver driver, boolean head) {
@@ -362,10 +364,10 @@ public class FetchImpl implements Fetch {
 		log.info("切换回主窗口，同时判断是否登录状态。");
 		int wtime = 10;
 		if (head)
-			wtime = 120;
+			wtime = 60;
 		int index = 0;
 		while (index < wtime) {
-			if (checkCookie(parseHtml(driver.getPageSource()))) {
+			if (checkCookie(driver.getPageSource())) {
 				try {
 					File f = new File(System.getProperty("user.dir") + "\\conf\\json.txt");
 					if (!f.exists())
@@ -451,10 +453,21 @@ public class FetchImpl implements Fetch {
 	}
 
 	// 判断坐上角是否有登录标志符
-	private boolean checkCookie(String pageData) {
+	private boolean checkCookie(String html) {
 		try {
-			driver.findElement(By.cssSelector("div[class~='login']"));
-			return true;
+			Document doc = Jsoup.parse(html);
+			Elements divs = doc.getElementsByTag("div");
+			for(Iterator<Element> i = divs.iterator(); i.hasNext(); ) {
+				Element next = i.next();
+				String attr = next.attr("class");
+				String[] split = attr.split(" ");
+				List<String> asList = Arrays.asList(split);
+				if(asList.contains("login")) {
+					return true;
+				}
+			}
+//			driver.findElement(By.cssSelector("div[class~='login']"));
+			return false;
 		} catch (Exception e) {
 			System.out.println("不存在此元素");
 			return false;

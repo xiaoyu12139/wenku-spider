@@ -54,7 +54,8 @@ public class MainFrame extends JFrame{
 		item2.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				JOptionPane.showMessageDialog(mainPanel, "首次使用，或者长期未使用要登录，登录采用qq账号登录，保证存在qq注册过正常登录百度账号。"
+				JOptionPane.showMessageDialog(mainPanel, "首次使用，或者长期未使用要登录，登录采用qq账号登录，保证存在qq注册过正常登录百度账号。\n"
+						+ "如果输入登录账号密码后自动登录失败，会回调浏览器窗口，等到打印输出信息-\"正在轮询……\"时点击浏览器弹出的登录窗口完成登录。"
 						+ "\n登录后，将百度文库文档url复制过来，点击download即可。", "使用操作",JOptionPane.WARNING_MESSAGE); 
 			}
 		});

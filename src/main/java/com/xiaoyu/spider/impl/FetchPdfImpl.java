@@ -42,9 +42,10 @@ public class FetchPdfImpl implements FetchPdf{
 		File out = new File(System.getProperty("user.dir") + "\\downloads");
 		if(!out.exists())
 			out.mkdir();
-		out = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + ".pdf");
-		if(out.exists())
-			out = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + new Date().getTime() + ".pdf");
+		File tmp = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + ".pdf");
+		if(tmp.exists())
+			tmp = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + new Date().getTime() + ".pdf");
+		out = tmp;
 		PdfWriter writer = PdfWriter.getInstance(document, new FileOutputStream(out));
 		document.open();
 		for(int i = 0; i < jsons.size(); i++) {

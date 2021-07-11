@@ -45,9 +45,10 @@ public class FetchPttImpl implements FetchPtt {
 		File out = new File(System.getProperty("user.dir") + "\\downloads");
 		if(!out.exists())
 			out.mkdir();
-		out = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + ".pptx");
-		if(out.exists())
-			out = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + new Date().getTime() + ".pptx");
+		File tmp = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + ".pptx");
+		if(tmp.exists())
+			tmp = new File(out.getAbsoluteFile() + "\\" + mid.title.getText().substring(5) + new Date().getTime() + ".pptx");
+		out = tmp;
 		JSONArray urls = getUrls(json);
 		for (int i = 0; i < urls.size(); i++) {
 			String url = urls.getString(i);
